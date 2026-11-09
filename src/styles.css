@@ -42,6 +42,7 @@ input:disabled, select:disabled, textarea:disabled { background: #f1f3f5; color:
 .btn:hover { background: var(--brand-2); }
 .btn:disabled { opacity: .6; cursor: default; }
 .btn-ghost { background: transparent; color: var(--brand); border: 1px solid var(--line); }
+a.btn { display: inline-block; text-decoration: none; }
 .btn-ghost:hover { background: #eef2f7; }
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 .btn-block { width: 100%; }

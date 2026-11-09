@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { collection, doc, getDocs, writeBatch } from 'firebase/firestore';
+import { useSearchParams } from 'react-router-dom';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { downloadExcel, readSheet } from '../lib/excel';
@@ -13,7 +14,8 @@ const ROWS_PER_BATCH = 200; // each product row can write 2 documents (product +
 
 export default function Import() {
   const { me, can, lists, company, canSeeCost } = useAuth();
-  const [type, setType] = useState('products');
+  const [params] = useSearchParams();
+  const [type, setType] = useState(['products', 'customers', 'suppliers'].includes(params.get('type')) ? params.get('type') : 'products');
   const [parsed, setParsed] = useState(null); // { rows, unknownCols, fileName }
   const [updateExisting, setUpdateExisting] = useState(true);
   const [busy, setBusy] = useState(false);

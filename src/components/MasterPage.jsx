@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   addDoc, collection, doc, getDocs, onSnapshot, query, setDoc, updateDoc, where,
 } from 'firebase/firestore';
@@ -102,6 +103,7 @@ export default function MasterPage({ title, collName, mod, fields, beforeSave, s
         </div>
         <div className="actions">
           {can(mod, 'export') && <button className="btn btn-ghost" onClick={doExport}>Export to Excel</button>}
+          {can('import', 'create') && can(mod, 'create') && <Link className="btn btn-ghost" to={`/import?type=${collName}`}>Import from Excel</Link>}
           {can(mod, 'create') && <button className="btn" onClick={openNew}>+ Add</button>}
         </div>
       </div>
