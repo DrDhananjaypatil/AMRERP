@@ -330,9 +330,15 @@ exports.updateStaff = onCall(async (request) => {
   return { ok: true, restamped: chainUpdates.length };
 });
 
+// ---------------------------------------------------------------- inventory (Phase 1A)
+
+const inventory = require('./inventory')({ getCaller, can });
+exports.postStockMove = inventory.postStockMove;
+
 // ---------------------------------------------------------------- auditTrail
 
-const SKIP_AUDIT = new Set(['auditLogs']);
+// Stock collections are not audited here: stockMoves IS their audit trail.
+const SKIP_AUDIT = new Set(['auditLogs', 'stock', 'stockMoves', 'serials']);
 const IGNORE_FIELDS = new Set(['updatedAt']);
 
 function same(a, b) {

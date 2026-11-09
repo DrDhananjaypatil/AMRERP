@@ -120,7 +120,7 @@ export default function Roles() {
                       <tbody>
                         {MODULES.map((m) => (
                           <tr key={m.id}>
-                            <td>{m.label} {m.phase > 0 && <Badge tone="muted">Phase {m.phase}</Badge>}</td>
+                            <td>{m.label} {!m.ready && <Badge tone="muted">Phase {m.phase}</Badge>}</td>
                             {ACTIONS.map((a) => (
                               <td key={a} className="center">
                                 {m.actions.includes(a) && (
@@ -140,6 +140,7 @@ export default function Roles() {
                       </tbody>
                     </table>
                   </div>
+                  <p className="muted small">Inventory: “create” = opening stock and transfers, “edit” = stock adjustments (add / remove with a reason).</p>
                   <p className="muted small">“delete” means deactivate. Records are never erased, so history and the audit log stay complete.</p>
 
                   <h3>Hidden information</h3>

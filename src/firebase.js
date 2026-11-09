@@ -20,3 +20,4 @@ export const functions = getFunctions(app, import.meta.env.VITE_FUNCTIONS_REGION
 export const callBootstrapOwner = httpsCallable(functions, 'bootstrapOwner');
 export const callCreateStaff = httpsCallable(functions, 'createStaff');
 export const callUpdateStaff = httpsCallable(functions, 'updateStaff');
+export const callPostStockMove = httpsCallable(functions, 'postStockMove');

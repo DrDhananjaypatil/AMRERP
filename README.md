@@ -130,5 +130,14 @@ firebase deploy --only firestore:rules        # publish rules changes
 firebase deploy --only functions              # publish function changes
 ```
 
-## What comes next (Phase 1)
+## Phase 1A — Inventory (live)
+
+- **Stock**: quantity per warehouse, low-stock filter, stock value at cost (cost-allowed roles only), movement history and serials per item.
+- **Stock entry**: opening stock, adjustments (add / remove, reason required), transfers between warehouses. All posted by the `postStockMove` Cloud Function in one transaction, so stock can never go negative and a serial number can't be in two places.
+- **Serial numbers**: look up any serial, where it is, or (from Phase 1B) which customer bought it and the warranty end date.
+- **QR labels**: print product labels (QR = SKU) and serial labels on A4; scan them with a phone camera in Stock entry and Serial numbers.
+- **Opening stock import**: Data import → Opening stock (SKU, Warehouse, Quantity, Serial numbers).
+- Role actions for Inventory: *create* = opening stock and transfers, *edit* = adjustments.
+
+## What comes next (Phase 1B and 1C)
 Inventory with stock by warehouse and serial numbers, QR labels, quotation → sales order → GST invoice → delivery challan, dealer/retail pricing with discount approvals, e-way bill, receivables with payment reminders, and the first live dashboard tiles. Opening stock and opening customer balances are imported at the start of Phase 1.

@@ -10,6 +10,10 @@ import Roles from './pages/Roles';
 import CompanySettings from './pages/CompanySettings';
 import Import from './pages/Import';
 import AuditLog from './pages/AuditLog';
+import Stock from './pages/inventory/Stock';
+import StockEntry from './pages/inventory/StockEntry';
+import Serials from './pages/inventory/Serials';
+import Labels from './pages/inventory/Labels';
 
 function Guard({ mod, act = 'view', ownerOnly, children }) {
   const { can, isOwner } = useAuth();
@@ -43,6 +47,10 @@ function Gate() {
         <Route path="products" element={<Guard mod="products"><Products /></Guard>} />
         <Route path="customers" element={<Guard mod="customers"><Customers /></Guard>} />
         <Route path="suppliers" element={<Guard mod="suppliers"><Suppliers /></Guard>} />
+        <Route path="stock" element={<Guard mod="inventory"><Stock /></Guard>} />
+        <Route path="stock/entry" element={<Guard mod="inventory"><StockEntry /></Guard>} />
+        <Route path="serials" element={<Guard mod="inventory"><Serials /></Guard>} />
+        <Route path="labels" element={<Guard mod="inventory"><Labels /></Guard>} />
         <Route path="staff" element={<Guard mod="staff"><Staff /></Guard>} />
         <Route path="roles" element={<Guard ownerOnly><Roles /></Guard>} />
         <Route path="settings" element={<Guard mod="settings"><CompanySettings /></Guard>} />

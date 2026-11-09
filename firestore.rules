@@ -118,6 +118,20 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ---------- Inventory: written only by Cloud Functions (postStockMove, and invoices later) ----------
+    match /stock/{id} {
+      allow read: if can('inventory', 'view');
+      allow write: if false;
+    }
+    match /stockMoves/{id} {
+      allow read: if can('inventory', 'view');
+      allow write: if false;
+    }
+    match /serials/{id} {
+      allow read: if can('inventory', 'view');
+      allow write: if false;
+    }
+
     // ---------- Audit log: written only by Cloud Functions, never editable ----------
     match /auditLogs/{id} {
       allow read: if can('audit', 'view');

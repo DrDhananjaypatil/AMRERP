@@ -9,13 +9,14 @@ import {
 } from '../lib/masters';
 import { ownerChainFor, stamp } from '../lib/data';
 import { ErrorNote } from '../components/ui';
+import OpeningStockImport from './inventory/OpeningStockImport';
 
 const ROWS_PER_BATCH = 200; // each product row can write 2 documents (product + cost); limit is 500 per batch
 
 export default function Import() {
   const { me, can, lists, company, canSeeCost } = useAuth();
   const [params] = useSearchParams();
-  const [type, setType] = useState(['products', 'customers', 'suppliers'].includes(params.get('type')) ? params.get('type') : 'products');
+  const [type, setType] = useState(['products', 'customers', 'suppliers', 'openingStock'].includes(params.get('type')) ? params.get('type') : 'products');
   const [parsed, setParsed] = useState(null); // { rows, unknownCols, fileName }
   const [updateExisting, setUpdateExisting] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -133,6 +134,8 @@ export default function Import() {
     setBusy(false); setProgress('');
   };
 
+  if (type === 'openingStock') return <OpeningStockImport setType={setType} />;
+
   return (
     <div className="page">
       <h1>Data import</h1>
@@ -146,6 +149,7 @@ export default function Import() {
               <option value="products">Products</option>
               <option value="customers">Customers</option>
               <option value="suppliers">Suppliers</option>
+              {can('inventory', 'create') && <option value="openingStock">Opening stock</option>}
             </select>
           </div>
           <div className="field">

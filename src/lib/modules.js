@@ -1,17 +1,17 @@
-// Every module the system will have. `phase` marks when it gets built.
+// Every module the system will have. `phase` marks when it gets built; `ready` = live now.
 // Roles are set up against this full list now, so the owner configures access once.
 export const ACTIONS = ['view', 'create', 'edit', 'delete', 'approve', 'export'];
 
 export const MODULES = [
-  { id: 'dashboard', label: 'Dashboard', phase: 0, actions: ['view'] },
-  { id: 'products', label: 'Products', phase: 0, actions: ['view', 'create', 'edit', 'delete', 'export'] },
-  { id: 'customers', label: 'Customers', phase: 0, actions: ['view', 'create', 'edit', 'delete', 'export'], scoped: true },
-  { id: 'suppliers', label: 'Suppliers', phase: 0, actions: ['view', 'create', 'edit', 'delete', 'export'] },
-  { id: 'staff', label: 'Staff & hierarchy', phase: 0, actions: ['view', 'create', 'edit'] },
-  { id: 'import', label: 'Data import', phase: 0, actions: ['create'] },
-  { id: 'settings', label: 'Company settings', phase: 0, actions: ['view', 'edit'] },
-  { id: 'audit', label: 'Audit log', phase: 0, actions: ['view'] },
-  { id: 'inventory', label: 'Inventory', phase: 1, actions: ['view', 'create', 'edit', 'delete', 'export'] },
+  { id: 'dashboard', ready: true, label: 'Dashboard', phase: 0, actions: ['view'] },
+  { id: 'products', ready: true, label: 'Products', phase: 0, actions: ['view', 'create', 'edit', 'delete', 'export'] },
+  { id: 'customers', ready: true, label: 'Customers', phase: 0, actions: ['view', 'create', 'edit', 'delete', 'export'], scoped: true },
+  { id: 'suppliers', ready: true, label: 'Suppliers', phase: 0, actions: ['view', 'create', 'edit', 'delete', 'export'] },
+  { id: 'staff', ready: true, label: 'Staff & hierarchy', phase: 0, actions: ['view', 'create', 'edit'] },
+  { id: 'import', ready: true, label: 'Data import', phase: 0, actions: ['create'] },
+  { id: 'settings', ready: true, label: 'Company settings', phase: 0, actions: ['view', 'edit'] },
+  { id: 'audit', ready: true, label: 'Audit log', phase: 0, actions: ['view'] },
+  { id: 'inventory', ready: true, label: 'Inventory', phase: 1, actions: ['view', 'create', 'edit', 'delete', 'export'] },
   { id: 'sales', label: 'Sales', phase: 1, actions: ['view', 'create', 'edit', 'delete', 'approve', 'export'], scoped: true },
   { id: 'receivables', label: 'Receivables', phase: 1, actions: ['view', 'create', 'export'], scoped: true },
   { id: 'purchase', label: 'Purchase', phase: 2, actions: ['view', 'create', 'edit', 'delete', 'approve', 'export'] },

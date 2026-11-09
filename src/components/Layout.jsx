@@ -15,6 +15,15 @@ const NAV = [
     ],
   },
   {
+    group: 'Inventory',
+    items: [
+      { to: '/stock', label: 'Stock', mod: 'inventory' },
+      { to: '/stock/entry', label: 'Stock entry', mod: 'inventory', anyAct: ['create', 'edit'] },
+      { to: '/serials', label: 'Serial numbers', mod: 'inventory' },
+      { to: '/labels', label: 'QR labels', mod: 'inventory' },
+    ],
+  },
+  {
     group: 'Admin',
     items: [
       { to: '/staff', label: 'Staff & hierarchy', mod: 'staff' },
@@ -29,7 +38,7 @@ const NAV = [
 export default function Layout() {
   const { me, role, company, can, isOwner, logout } = useAuth();
   const [open, setOpen] = useState(false);
-  const comingSoon = MODULES.filter((m) => m.phase > 0 && can(m.id, 'view'));
+  const comingSoon = MODULES.filter((m) => !m.ready && can(m.id, 'view'));
 
   return (
     <div className={`shell ${open ? 'nav-open' : ''}`}>
@@ -47,7 +56,7 @@ export default function Layout() {
 
       <nav className="sidebar" onClick={() => setOpen(false)}>
         {NAV.map((sec) => {
-          const items = sec.items.filter((i) => (i.ownerOnly ? isOwner : can(i.mod, i.act || 'view')));
+          const items = sec.items.filter((i) => (i.ownerOnly ? isOwner : i.anyAct ? i.anyAct.some((a) => can(i.mod, a)) : can(i.mod, i.act || 'view')));
           if (!items.length) return null;
           return (
             <div key={sec.group || 'main'} className="nav-group">
