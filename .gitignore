@@ -6,3 +6,5 @@ dist
 *.log
 functions/node_modules
 .firebaserc
+package-lock.json
+functions/package-lock.json
