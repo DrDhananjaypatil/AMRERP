@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { INDIAN_STATES } from '../lib/modules';
 import { isValidGstin, slugify, stamp } from '../lib/data';
 import { ErrorNote } from '../components/ui';
+import { unitLogo } from '../lib/brand';
 
 const LIST_KEYS = [
   { key: 'categories', label: 'Product categories' },
@@ -72,10 +73,11 @@ export default function CompanySettings() {
         <p className="muted small">If both units bill under the same GSTIN, enter the same number for both.</p>
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Name</th><th>Type</th><th>GSTIN</th><th>State</th><th>Address</th><th>Phone</th></tr></thead>
+            <thead><tr><th>Logo</th><th>Name</th><th>Type</th><th>GSTIN</th><th>State</th><th>Address</th><th>Phone</th></tr></thead>
             <tbody>
               {c.units.map((u, i) => (
                 <tr key={u.id || i}>
+                  <td>{unitLogo(u.id) ? <img className="unit-logo" src={unitLogo(u.id)} alt={u.name} /> : <span className="muted small">—</span>}</td>
                   <td><input disabled={!editable} value={u.name} onChange={(e) => setUnit(i, 'name', e.target.value)} /></td>
                   <td><input disabled={!editable} value={u.kind || ''} onChange={(e) => setUnit(i, 'kind', e.target.value)} /></td>
                   <td><input disabled={!editable} value={u.gstin || ''} onChange={(e) => setUnit(i, 'gstin', e.target.value.toUpperCase())} placeholder="27ABCDE1234F1Z5" /></td>

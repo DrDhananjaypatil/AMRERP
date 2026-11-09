@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { MODULES } from '../lib/modules';
+import { MAIN_LOGO } from '../lib/brand';
 
 const NAV = [
   { group: null, items: [{ to: '/', label: 'Dashboard', mod: 'dashboard', end: true }] },
@@ -34,7 +35,9 @@ export default function Layout() {
     <div className={`shell ${open ? 'nav-open' : ''}`}>
       <header className="topbar">
         <button className="btn-icon menu-btn" onClick={() => setOpen(!open)} aria-label="Menu">☰</button>
-        <div className="brand">{company?.name || 'AMR Wheels'}</div>
+        <NavLink to="/" className="brand" title={company?.name || 'AMR Wheels'}>
+          <img src={MAIN_LOGO.white} alt={company?.name || 'AMR Wheels'} />
+        </NavLink>
         <div className="who">
           <span className="who-name">{me?.name}</span>
           <span className="who-role">{role?.name}</span>

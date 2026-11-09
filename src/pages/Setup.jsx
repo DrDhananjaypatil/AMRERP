@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { callBootstrapOwner } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { ErrorNote } from '../components/ui';
+import { MAIN_LOGO } from '../lib/brand';
 
 // Shown when someone is signed in but has no staff profile yet.
 export default function Setup() {
@@ -40,6 +41,7 @@ export default function Setup() {
   return (
     <div className="auth-page">
       <form className="auth-card stack" onSubmit={run}>
+        <img className="auth-logo" src={MAIN_LOGO.color} alt="AMR Wheels" />
         <h1>Set up the company</h1>
         <p className="muted small">
           If the company is not set up yet, you become the Owner / CEO with full access.

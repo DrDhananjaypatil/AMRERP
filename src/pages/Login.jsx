@@ -5,6 +5,7 @@ import {
 } from 'firebase/auth';
 import { auth } from '../firebase';
 import { ErrorNote } from '../components/ui';
+import { LOGOS } from '../lib/brand';
 
 const friendly = (e) => {
   const c = e?.code || '';
@@ -22,8 +23,11 @@ export default function Login() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>AMR Wheels</h1>
-        <p className="muted">Management system</p>
+        <div className="auth-logos">
+          <img src={LOGOS['amr-wheels'].color} alt="AMR Wheels" />
+          <img src={LOGOS['amr-technofab'].color} alt="AMR Technofab" />
+        </div>
+        <p className="muted center">Management system</p>
         <div className="tabs">
           <button className={tab === 'email' ? 'active' : ''} onClick={() => setTab('email')}>Email</button>
           <button className={tab === 'phone' ? 'active' : ''} onClick={() => setTab('phone')}>Mobile OTP</button>
