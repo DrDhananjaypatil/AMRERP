@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -20,8 +20,11 @@ export function useCollection(name, enabled = true) {
 // Active products sorted by name, plus a lookup by id and by SKU.
 export function useProducts() {
   const [rows, error] = useCollection('products');
-  const list = (rows || []).filter((p) => p.isActive !== false).sort((a, b) => String(a.name).localeCompare(String(b.name)));
-  const byId = Object.fromEntries((rows || []).map((p) => [p.id, p]));
-  const bySku = Object.fromEntries((rows || []).map((p) => [String(p.sku || '').trim().toUpperCase(), p]));
-  return { products: list, byId, bySku, loading: rows === null, error };
+  // Memoised so screens only re-render when the products actually change (not on every render).
+  return useMemo(() => {
+    const list = (rows || []).filter((p) => p.isActive !== false).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    const byId = Object.fromEntries((rows || []).map((p) => [p.id, p]));
+    const bySku = Object.fromEntries((rows || []).map((p) => [String(p.sku || '').trim().toUpperCase(), p]));
+    return { products: list, byId, bySku, loading: rows === null, error };
+  }, [rows, error]);
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import QRCode from 'qrcode';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -25,7 +25,6 @@ export default function Labels() {
   const [items, setItems] = useState([]); // product mode: [{productId, copies}]
   const [serialProduct, setSerialProduct] = useState('');
   const [serials, setSerials] = useState([]); // [{serial, checked}]
-  const [labels, setLabels] = useState([]); // [{code, title, sub}]
   const [qr, setQr] = useState({});
   const [error, setError] = useState(null);
 
@@ -37,28 +36,30 @@ export default function Labels() {
       .catch(setError);
   }, [mode, serialProduct]);
 
-  // Build the label list
-  useEffect(() => {
+  // The label list is derived directly from the choices (no extra state, so no render loops).
+  const labels = useMemo(() => {
     if (mode === 'product') {
-      setLabels(items.flatMap((it) => {
+      return items.flatMap((it) => {
         const p = byId[it.productId];
         if (!p) return [];
         return Array.from({ length: Math.max(1, Math.min(200, Number(it.copies) || 1)) }, () => ({ code: p.sku, title: p.sku, sub: p.name }));
-      }));
-    } else {
-      const p = byId[serialProduct];
-      setLabels(serials.filter((s) => s.checked).map((s) => ({ code: s.serial, title: `S/N ${s.serial}`, sub: p ? `${p.sku} — ${p.name}` : '' })));
+      });
     }
+    const p = byId[serialProduct];
+    return serials.filter((s) => s.checked).map((s) => ({ code: s.serial, title: `S/N ${s.serial}`, sub: p ? `${p.sku} — ${p.name}` : '' }));
   }, [mode, items, serials, serialProduct, byId]);
 
-  // Generate QR images (cached by code)
+  // Generate QR images (cached by code); only runs when the set of codes changes
+  const codesKey = [...new Set(labels.map((l) => l.code))].sort().join('\n');
   useEffect(() => {
-    const missing = [...new Set(labels.map((l) => l.code))].filter((c) => !qr[c]);
+    const missing = codesKey ? codesKey.split('\n').filter((c) => !qr[c]) : [];
     if (!missing.length) return;
+    let cancelled = false;
     Promise.all(missing.map((c) => QRCode.toDataURL(c, { margin: 0, width: 240, errorCorrectionLevel: 'M' }).then((url) => [c, url])))
-      .then((pairs) => setQr((q) => ({ ...q, ...Object.fromEntries(pairs) })))
+      .then((pairs) => { if (!cancelled) setQr((q) => ({ ...q, ...Object.fromEntries(pairs) })); })
       .catch(setError);
-  }, [labels]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { cancelled = true; };
+  }, [codesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const logo = LOGOS[unitId]?.color;
 
