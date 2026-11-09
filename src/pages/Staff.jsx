@@ -52,7 +52,7 @@ export default function Staff() {
             </thead>
             <tbody>
               {sorted.map((u) => {
-                const editable = u.uid !== me.uid && u.roleId !== 'owner' && can('staff', 'edit') && manageable(u);
+                const editable = u.uid !== me.uid && (u.roleId !== 'owner' || isOwner) && can('staff', 'edit') && manageable(u);
                 return (
                   <tr key={u.uid} className={u.active ? '' : 'row-inactive'} onClick={() => editable && setEditing(u)}>
                     <td><b>{u.name}</b></td>
@@ -80,7 +80,7 @@ export default function Staff() {
         <StaffModal
           user={editing.uid ? editing : null}
           users={users}
-          roles={roles.filter((r) => r.id !== 'owner' && r.isActive !== false)}
+          roles={roles.filter((r) => (r.id !== 'owner' || isOwner) && r.isActive !== false)}
           units={company?.units || []}
           me={me}
           isOwner={isOwner}
@@ -108,7 +108,13 @@ function StaffModal({ user, users, roles, units, me, isOwner, onClose }) {
     : { name: '', designation: '', roleId: '', unitId: 'all', reportsTo: me.uid, email: '', phone: '', password: '', active: true }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const set = (k) => (v) => setD((x) => ({ ...x, [k]: v }));
+  const set = (k) => (v) => setD((x) => {
+    const next = { ...x, [k]: v };
+    // Owners sit at the top: no manager. Moving someone out of Owner needs a manager again.
+    if (k === 'roleId' && v !== 'owner' && !next.reportsTo) next.reportsTo = me.uid;
+    return next;
+  });
+  const asOwner = d.roleId === 'owner';
 
   // A person cannot report to themselves or to anyone below them.
   const managerOptions = users
@@ -125,7 +131,7 @@ function StaffModal({ user, users, roles, units, me, isOwner, onClose }) {
     setBusy(true);
     try {
       const payload = {
-        name: d.name, designation: d.designation, roleId: d.roleId, unitId: d.unitId, reportsTo: d.reportsTo,
+        name: d.name, designation: d.designation, roleId: d.roleId, unitId: d.unitId, reportsTo: asOwner ? null : d.reportsTo,
         email: d.email || null, phone: d.phone || null,
         ...(d.password ? { password: d.password } : {}),
       };
@@ -148,8 +154,10 @@ function StaffModal({ user, users, roles, units, me, isOwner, onClose }) {
       <form id="staff-form" className="form-grid" onSubmit={submit}>
         <FieldInput field={{ key: 'name', label: 'Full name', type: 'text', required: true }} value={d.name} onChange={set('name')} />
         <FieldInput field={{ key: 'designation', label: 'Designation', type: 'text', help: 'e.g. Sales Executive, Store In-charge, Welder' }} value={d.designation} onChange={set('designation')} />
-        <FieldInput field={{ key: 'roleId', label: 'Role', type: 'select', required: true, options: roles.map((r) => ({ value: r.id, label: r.name })), help: 'Decides which modules and actions they get.' }} value={d.roleId} onChange={set('roleId')} />
-        <FieldInput field={{ key: 'reportsTo', label: 'Reports to', type: 'select', required: true, options: managerOptions }} value={d.reportsTo} onChange={set('reportsTo')} />
+        <FieldInput field={{ key: 'roleId', label: 'Role', type: 'select', required: true, options: roles.map((r) => ({ value: r.id, label: r.id === 'owner' ? `${r.name} (full access)` : r.name })), help: asOwner ? 'Owners see and control everything, including roles, salaries and the audit log.' : 'Decides which modules and actions they get.' }} value={d.roleId} onChange={set('roleId')} />
+        {asOwner
+          ? <div className="field"><label>Reports to</label><input disabled value="— (owners are at the top)" /></div>
+          : <FieldInput field={{ key: 'reportsTo', label: 'Reports to', type: 'select', required: true, options: managerOptions }} value={d.reportsTo} onChange={set('reportsTo')} />}
         <FieldInput field={{ key: 'unitId', label: 'Unit', type: 'select', required: true, options: [{ value: 'all', label: 'All units' }, ...units.map((u) => ({ value: u.id, label: u.name }))] }} value={d.unitId} onChange={set('unitId')} />
         <div className="field-full section-label">Login — email + password, mobile OTP, or both</div>
         <FieldInput field={{ key: 'email', label: 'Email', type: 'text' }} value={d.email} onChange={set('email')} />

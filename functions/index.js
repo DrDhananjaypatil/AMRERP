@@ -60,6 +60,11 @@ async function isInSubtree(uid, managerUid) {
   return snap.exists && (snap.data().managerChain || []).includes(managerUid);
 }
 
+async function otherActiveOwners(exceptUid) {
+  const snap = await db.collection('users').where('roleId', '==', 'owner').where('active', '==', true).get();
+  return snap.docs.filter((d) => d.id !== exceptUid).length;
+}
+
 function mapAuthError(err) {
   const code = err && err.code ? err.code : '';
   if (code.includes('email-already-exists')) return new HttpsError('already-exists', 'This email is already used by another login.');
@@ -145,20 +150,26 @@ exports.createStaff = onCall(async (request) => {
   const password = d.password || null;
   const phone = normalizePhone(clean(d.phone));
   const roleId = clean(d.roleId);
-  const reportsTo = clean(d.reportsTo) || caller.uid;
+  const makeOwner = roleId === 'owner';
+  const reportsTo = makeOwner ? null : clean(d.reportsTo) || caller.uid;
 
   if (!name) throw new HttpsError('invalid-argument', 'Name is required.');
   if (!email && !phone) throw new HttpsError('invalid-argument', 'Give an email + password, a mobile number, or both.');
   if (email && !password) throw new HttpsError('invalid-argument', 'A password is needed for email login.');
-  if (!roleId || roleId === 'owner') throw new HttpsError('invalid-argument', 'Choose a role (Owner cannot be assigned).');
+  if (!roleId) throw new HttpsError('invalid-argument', 'Choose a role.');
+  if (makeOwner && !caller.isOwner) throw new HttpsError('permission-denied', 'Only an owner can add another owner.');
 
   const roleSnap = await db.doc(`roles/${roleId}`).get();
   if (!roleSnap.exists || roleSnap.data().isActive === false) throw new HttpsError('invalid-argument', 'That role does not exist.');
 
-  const managerSnap = await db.doc(`users/${reportsTo}`).get();
-  if (!managerSnap.exists || managerSnap.data().active !== true) throw new HttpsError('invalid-argument', 'The selected manager is not an active user.');
-  if (!caller.isOwner && !(await isInSubtree(reportsTo, caller.uid))) {
-    throw new HttpsError('permission-denied', 'You can only add staff under yourself or your team.');
+  let managerChain = [];
+  if (!makeOwner) {
+    const managerSnap = await db.doc(`users/${reportsTo}`).get();
+    if (!managerSnap.exists || managerSnap.data().active !== true) throw new HttpsError('invalid-argument', 'The selected manager is not an active user.');
+    if (!caller.isOwner && !(await isInSubtree(reportsTo, caller.uid))) {
+      throw new HttpsError('permission-denied', 'You can only add staff under yourself or your team.');
+    }
+    managerChain = [reportsTo, ...(managerSnap.data().managerChain || [])];
   }
 
   let authUser;
@@ -180,7 +191,7 @@ exports.createStaff = onCall(async (request) => {
     roleId,
     unitId: clean(d.unitId) || 'all',
     reportsTo,
-    managerChain: [reportsTo, ...(managerSnap.data().managerChain || [])],
+    managerChain,
     active: true,
     updatedBy: caller.uid,
     updatedAt: FieldValue.serverTimestamp(),
@@ -205,7 +216,7 @@ exports.updateStaff = onCall(async (request) => {
   const editingSelfOnlyBasics = uid === caller.uid;
   if (!editingSelfOnlyBasics) {
     if (!can(caller, 'staff', 'edit')) throw new HttpsError('permission-denied', 'You cannot edit staff.');
-    if (targetIsOwner) throw new HttpsError('permission-denied', 'Only the owner can edit the owner account.');
+    if (targetIsOwner && !caller.isOwner) throw new HttpsError('permission-denied', 'Only an owner can edit an owner account.');
     if (!caller.isOwner && !(await isInSubtree(uid, caller.uid))) {
       throw new HttpsError('permission-denied', 'You can only edit people in your team.');
     }
@@ -224,14 +235,25 @@ exports.updateStaff = onCall(async (request) => {
     authUpdate.phoneNumber = p; // null removes mobile login
   }
 
-  // Role, unit, manager and active status can't be changed on yourself or the owner.
-  const structural = ['roleId', 'unitId', 'reportsTo', 'active'].some((k) => d[k] !== undefined);
-  if (structural && (editingSelfOnlyBasics || targetIsOwner)) {
-    throw new HttpsError('permission-denied', 'Role, manager, unit and status cannot be changed for yourself or the owner.');
+  // Nobody changes their own role, manager, unit or status (another owner must do it).
+  const structural = ['roleId', 'unitId', 'reportsTo', 'active'].some((k) => d[k] !== undefined && d[k] !== target[k]);
+  if (structural && editingSelfOnlyBasics) {
+    throw new HttpsError('permission-denied', 'Your own role, manager, unit and status can only be changed by an owner.');
   }
 
-  if (d.roleId !== undefined) {
-    if (d.roleId === 'owner') throw new HttpsError('invalid-argument', 'Owner cannot be assigned.');
+  const becomingOwner = d.roleId === 'owner' && !targetIsOwner;
+  const leavingOwner = targetIsOwner && d.roleId !== undefined && d.roleId !== 'owner';
+  const finalIsOwner = becomingOwner || (targetIsOwner && !leavingOwner);
+
+  if ((becomingOwner || leavingOwner) && !caller.isOwner) {
+    throw new HttpsError('permission-denied', 'Only an owner can give or remove the Owner role.');
+  }
+  const deactivating = d.active !== undefined && d.active !== true && target.active === true;
+  if ((leavingOwner || (targetIsOwner && deactivating)) && (await otherActiveOwners(uid)) === 0) {
+    throw new HttpsError('failed-precondition', 'This is the only active owner. Make someone else an owner first.');
+  }
+
+  if (d.roleId !== undefined && d.roleId !== target.roleId) {
     const r = await db.doc(`roles/${d.roleId}`).get();
     if (!r.exists) throw new HttpsError('invalid-argument', 'That role does not exist.');
     userUpdate.roleId = d.roleId;
@@ -245,18 +267,25 @@ exports.updateStaff = onCall(async (request) => {
   // Manager change: recompute this person's chain and everyone below them,
   // then re-stamp ownerChain on their customers so managers keep seeing their team's records.
   let chainUpdates = [];
-  if (d.reportsTo !== undefined && d.reportsTo !== target.reportsTo) {
-    const newManager = clean(d.reportsTo);
-    if (!newManager || newManager === uid) throw new HttpsError('invalid-argument', 'Choose a different manager.');
-    const mSnap = await db.doc(`users/${newManager}`).get();
-    if (!mSnap.exists || mSnap.data().active !== true) throw new HttpsError('invalid-argument', 'Manager is not an active user.');
-    const mChain = mSnap.data().managerChain || [];
-    if (mChain.includes(uid)) throw new HttpsError('invalid-argument', 'That would create a loop: the new manager reports to this person.');
-    if (!caller.isOwner && !(await isInSubtree(newManager, caller.uid))) {
-      throw new HttpsError('permission-denied', 'The new manager must be in your team.');
-    }
+  const desiredManager = finalIsOwner
+    ? null
+    : (d.reportsTo !== undefined ? clean(d.reportsTo) || null : target.reportsTo || null);
+  if (!finalIsOwner && !desiredManager) throw new HttpsError('invalid-argument', 'Choose who this person reports to.');
 
-    const newChain = [newManager, ...mChain];
+  if (desiredManager !== (target.reportsTo || null)) {
+    let newChain = [];
+    if (desiredManager) {
+      if (desiredManager === uid) throw new HttpsError('invalid-argument', 'Choose a different manager.');
+      const mSnap = await db.doc(`users/${desiredManager}`).get();
+      if (!mSnap.exists || mSnap.data().active !== true) throw new HttpsError('invalid-argument', 'Manager is not an active user.');
+      const mChain = mSnap.data().managerChain || [];
+      if (mChain.includes(uid)) throw new HttpsError('invalid-argument', 'That would create a loop: the new manager reports to this person.');
+      if (!caller.isOwner && !(await isInSubtree(desiredManager, caller.uid))) {
+        throw new HttpsError('permission-denied', 'The new manager must be in your team.');
+      }
+      newChain = [desiredManager, ...mChain];
+    }
+    const newManager = desiredManager;
     userUpdate.reportsTo = newManager;
     userUpdate.managerChain = newChain;
     chainUpdates.push({ uid, chain: newChain });
