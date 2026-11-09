@@ -180,7 +180,33 @@ exports.createStaff = onCall(async (request) => {
       ...(phone ? { phoneNumber: phone } : {}),
     });
   } catch (err) {
-    throw mapAuthError(err);
+    const code = err && err.code ? err.code : '';
+    if (!code.includes('email-already-exists') && !code.includes('phone-number-already-exists')) throw mapAuthError(err);
+
+    // The person already has a login (e.g. they tried "First-time setup" or OTP sign-in before being added)
+    // but no staff profile. Adopt that login instead of failing.
+    const byEmail = email ? await adminAuth.getUserByEmail(email).catch(() => null) : null;
+    const byPhone = phone ? await adminAuth.getUserByPhoneNumber(phone).catch(() => null) : null;
+    if (byEmail && byPhone && byEmail.uid !== byPhone.uid) {
+      throw new HttpsError('already-exists', 'This email and this mobile number belong to two different logins. Use only one of them, or remove the other login in Firebase Authentication.');
+    }
+    const existing = byEmail || byPhone;
+    if (!existing) throw mapAuthError(err);
+
+    const profile = await db.doc(`users/${existing.uid}`).get();
+    if (profile.exists) {
+      throw new HttpsError('already-exists', `${profile.data().name} is already on the staff list with this ${byEmail ? 'email' : 'mobile number'}. Edit them instead of adding again.`);
+    }
+    try {
+      authUser = await adminAuth.updateUser(existing.uid, {
+        displayName: name,
+        disabled: false,
+        ...(email ? { email, ...(password ? { password } : {}) } : {}),
+        ...(phone ? { phoneNumber: phone } : {}),
+      });
+    } catch (e) {
+      throw mapAuthError(e);
+    }
   }
 
   await db.doc(`users/${authUser.uid}`).set({
