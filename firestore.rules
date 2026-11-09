@@ -1,0 +1,132 @@
+rules_version = '2';
+
+// AMR Wheels — Phase 0 security rules.
+// The browser can be bypassed, so every permission is enforced HERE, not just in the UI.
+//
+// Model:
+//   users/{uid}      -> roleId, unitId, managerChain (uids from direct manager up to the top), active
+//   roles/{roleId}   -> permissions { module: [actions] }, scopes { module: own|team|unit|all }, canSeeCost
+//   Records that belong to a person (customers now; quotations/orders later) carry
+//   ownerId, ownerChain = [ownerId, ...owner's managerChain], unitId.
+//   Every client write must stamp updatedBy = the signed-in user and updatedAt = server time,
+//   so the audit log (written by a Cloud Function) always knows who changed what.
+//   Nothing is hard-deleted from the browser: records are deactivated (isActive = false).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function userPath(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function me() { return get(userPath(request.auth.uid)).data; }
+    function active() {
+      return signedIn() && exists(userPath(request.auth.uid)) && me().active == true;
+    }
+    function isOwner() { return active() && me().roleId == 'owner'; }
+    function role() { return get(/databases/$(database)/documents/roles/$(me().roleId)).data; }
+
+    function can(mod, act) {
+      return isOwner() || (active() && act in role().permissions.get(mod, []));
+    }
+
+    // Data scope for person-owned records. Missing setting = 'own' (the safe default).
+    function scopeOf(mod) {
+      return isOwner() ? 'all' : role().get('scopes', {}).get(mod, 'own');
+    }
+    function inScope(mod, d) {
+      let s = scopeOf(mod);
+      return s == 'all'
+        || (s == 'own' && d.ownerId == request.auth.uid)
+        || (s == 'team' && request.auth.uid in d.ownerChain)
+        || (s == 'unit' && d.unitId == me().unitId);
+    }
+
+    // ownerChain must match the owner's real hierarchy, so nobody can hide a record from their manager.
+    function chainOk(d) {
+      return d.ownerChain == [d.ownerId].concat(get(userPath(d.ownerId)).data.managerChain);
+    }
+
+    function stamped() {
+      return request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function onlyActiveFlagChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['isActive', 'updatedBy', 'updatedAt']);
+    }
+
+    function canSeeCost() {
+      return isOwner() || (active() && role().get('canSeeCost', false) == true);
+    }
+
+    // ---------- Company settings and pick-lists ----------
+    match /config/{docId} {
+      allow read: if active();
+      allow write: if can('settings', 'edit') && stamped();
+    }
+
+    // ---------- Roles: only the owner edits; the owner role itself is locked ----------
+    match /roles/{roleId} {
+      allow read: if active();
+      allow create, update: if isOwner() && roleId != 'owner' && stamped();
+      allow delete: if false;
+    }
+
+    // ---------- Users: written only by Cloud Functions (createStaff / updateStaff) ----------
+    match /users/{uid} {
+      // Anyone can read their own profile (so a deactivated user sees "Account inactive").
+      allow read: if (signedIn() && uid == request.auth.uid) || can('staff', 'view');
+      allow write: if false;
+    }
+
+    // ---------- Products (no cost fields here; costs live in productCosts) ----------
+    match /products/{id} {
+      allow read: if can('products', 'view');
+      allow create: if can('products', 'create') && stamped()
+        && !('costPrice' in request.resource.data);
+      allow update: if stamped() && !('costPrice' in request.resource.data) && (
+        can('products', 'edit') || (can('products', 'delete') && onlyActiveFlagChanged())
+      );
+      allow delete: if false;
+    }
+
+    // Hidden-field example: cost price is readable only by roles with canSeeCost.
+    match /productCosts/{id} {
+      allow read: if canSeeCost() && can('products', 'view');
+      allow write: if canSeeCost() && (can('products', 'edit') || can('products', 'create')) && stamped();
+    }
+
+    // ---------- Customers (person-owned, data scope applies) ----------
+    match /customers/{id} {
+      allow read: if can('customers', 'view') && inScope('customers', resource.data);
+      allow create: if can('customers', 'create') && stamped()
+        && chainOk(request.resource.data) && inScope('customers', request.resource.data);
+      allow update: if stamped()
+        && inScope('customers', resource.data)
+        && chainOk(request.resource.data) && inScope('customers', request.resource.data)
+        && (can('customers', 'edit') || (can('customers', 'delete') && onlyActiveFlagChanged()));
+      allow delete: if false;
+    }
+
+    // ---------- Suppliers ----------
+    match /suppliers/{id} {
+      allow read: if can('suppliers', 'view');
+      allow create: if can('suppliers', 'create') && stamped();
+      allow update: if stamped() && (
+        can('suppliers', 'edit') || (can('suppliers', 'delete') && onlyActiveFlagChanged())
+      );
+      allow delete: if false;
+    }
+
+    // ---------- Audit log: written only by Cloud Functions, never editable ----------
+    match /auditLogs/{id} {
+      allow read: if can('audit', 'view');
+      allow write: if false;
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
